@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Voicebox — Text to Speech</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Space+Grotesk:wght@400;500;600&display=swap');
+
+  :root{
+    --bg: #0f1410;
+    --panel: #161d17;
+    --panel-line: #2a352b;
+    --ink: #eef1ea;
+    --muted: #8ea08e;
+    --accent: #ffb84d;
+    --accent-dim: #8a6a2f;
+    --wave: #5fd6a0;
+  }
+  *{ box-sizing:border-box; }
+  html,body{ height:100%; }
+  body{
+    margin:0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Space Grotesk', sans-serif;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    padding: 32px 18px 60px;
+  }
+
+  header{
+    width:100%;
+    max-width: 760px;
+    margin-bottom: 28px;
+  }
+  .eyebrow{
+    font-size: 12px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--wave);
+    margin-bottom: 6px;
+  }
+  h1{
+    font-family: 'Fraunces', serif;
+    font-weight: 700;
+    font-size: 40px;
+    margin: 0 0 6px;
+    letter-spacing: -0.01em;
+  }
+  .sub{
+    color: var(--muted);
+    font-size: 14.5px;
+    max-width: 56ch;
+    line-height: 1.5;
+  }
+
+  main{
+    width:100%;
+    max-width: 760px;
+    background: var(--panel);
+    border: 1px solid var(--panel-line);
+    border-radius: 16px;
+    padding: 24px;
+  }
+
+  /* Signature element: live waveform bar that reacts to speaking state */
+  .wave-strip{
+    display:flex;
+    align-items:flex-end;
+    justify-content:center;
+    gap: 4px;
+    height: 46px;
+    margin-bottom: 20px;
+  }
+  .wave-strip span{
+    width: 4px;
+    height: 10px;
+    background: var(--panel-line);
+    border-radius: 2px;
+    transition: height 0.15s ease, background 0.2s ease;
+  }
+  .wave-strip.active span{
+    background: var(--wave);
+    animation: bob 1s ease-in-out infinite;
+  }
+  .wave-strip span:nth-child(odd){ animation-delay: -0.3s; }
+  .wave-strip span:nth-child(3n){ animation-delay: -0.6s; }
+  @keyframes bob{
+    0%,100% { height: 8px; }
+    50% { height: 38px; }
+  }
+
+  textarea{
+    width:100%;
+    min-height: 140px;
+    background: #0c110d;
+    border: 1px solid var(--panel-line);
+    border-radius: 10px;
+    color: var(--ink);
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 15px;
+    line-height: 1.6;
+    padding: 14px;
+    resize: vertical;
+  }
+  textarea:focus{ outline: 2px solid var(--accent); outline-offset: 1px; }
+
+  .row{
+    display:flex;
+    gap: 14px;
+    margin-top: 16px;
+    flex-wrap: wrap;
+  }
+  .field{
+    flex: 1 1 160px;
+    display:flex;
+    flex-direction:column;
+    gap: 6px;
+  }
+  label{
+    font-size: 11.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+  }
+  select, input[type=range]{
+    width: 100%;
+  }
+  select{
+    background: #0c110d;
+    color: var(--ink);
+    border: 1px solid var(--panel-line);
+    border-radius: 8px;
+    padding: 9px 10px;
+    font-family: inherit;
+    font-size: 13.5px;
+  }
+  select:focus{ outline: 2px solid var(--accent); }
+
+  input[type=range]{
+    accent-color: var(--accent);
+  }
+  .sliderval{
+    font-size: 12px;
+    color: var(--wave);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .controls{
+    display:flex;
+    gap: 10px;
+    margin-top: 22px;
+    flex-wrap: wrap;
+  }
+  button{
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 500;
+    border-radius: 9px;
+    padding: 11px 20px;
+    border: 1px solid var(--panel-line);
+    background: transparent;
+    color: var(--ink);
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease;
+  }
+  button:focus-visible{ outline: 2px solid var(--accent); outline-offset: 2px; }
+  button.primary{
+    background: var(--accent);
+    color: #1a1406;
+    border-color: var(--accent);
+    font-weight: 600;
+  }
+  button.primary:hover{ background: #ffc670; }
+  button:not(.primary):hover{ border-color: var(--wave); }
+  button:disabled{
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  .status{
+    margin-top: 14px;
+    font-size: 12.5px;
+    color: var(--muted);
+    min-height: 16px;
+  }
+
+  .note{
+    max-width: 760px;
+    margin-top: 18px;
+    font-size: 12.5px;
+    color: var(--muted);
+    line-height: 1.6;
+  }
+  .note b{ color: var(--ink); }
+
+  @media (prefers-reduced-motion: reduce){
+    .wave-strip.active span{ animation: none; height: 20px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="eyebrow">Free · runs entirely in your browser</div>
+  <h1>Voicebox</h1>
+  <div class="sub">Type or paste text, pick a voice, and listen. No API key, no server, no cost — powered by your browser's built-in speech engine.</div>
+</header>
+
+<main>
+  <div class="wave-strip" id="waveStrip">
+    <span></span><span></span><span></span><span></span><span></span>
+    <span></span><span></span><span></span><span></span><span></span>
+    <span></span><span></span><span></span><span></span><span></span>
+    <span></span><span></span><span></span><span></span><span></span>
+  </div>
+
+  <textarea id="textInput" placeholder="Write or paste text here… (আপনি বাংলা টেক্সটও লিখতে পারেন)"></textarea>
+
+  <div class="row">
+    <div class="field">
+      <label for="voiceSelect">Voice</label>
+      <select id="voiceSelect"></select>
+    </div>
+    <div class="field">
+      <label for="rate">Speed — <span class="sliderval" id="rateVal">1.0x</span></label>
+      <input type="range" id="rate" min="0.5" max="2" step="0.1" value="1">
+    </div>
+    <div class="field">
+      <label for="pitch">Pitch — <span class="sliderval" id="pitchVal">1.0</span></label>
+      <input type="range" id="pitch" min="0" max="2" step="0.1" value="1">
+    </div>
+  </div>
+
+  <div class="controls">
+    <button class="primary" id="playBtn">▶ Speak</button>
+    <button id="pauseBtn" disabled>Pause</button>
+    <button id="resumeBtn" disabled>Resume</button>
+    <button id="stopBtn" disabled>Stop</button>
+  </div>
+
+  <div class="status" id="status">Ready.</div>
+</main>
+
+<div class="note">
+  <b>Why this is free:</b> browsers ship a native <code>speechSynthesis</code> engine — this app just calls it directly, so there's zero backend and zero API cost. <b>Bengali support:</b> if a Bengali voice doesn't appear in the list, install one from your device's system language settings (Android: Settings → Text-to-speech; Windows: Settings → Time & Language → Speech). <b>Limitation:</b> browsers don't let this API export an audio file directly — if you need a downloadable MP3, that's a separate step (e.g. a screen/audio recorder while it plays, or a paid TTS API like Google Cloud or ElevenLabs for exports).
+</div>
+
+<script>
+  const textInput = document.getElementById('textInput');
+  const voiceSelect = document.getElementById('voiceSelect');
+  const rate = document.getElementById('rate');
+  const pitch = document.getElementById('pitch');
+  const rateVal = document.getElementById('rateVal');
+  const pitchVal = document.getElementById('pitchVal');
+  const playBtn = document.getElementById('playBtn');
+  const pauseBtn = document.getElementById('pauseBtn');
+  const resumeBtn = document.getElementById('resumeBtn');
+  const stopBtn = document.getElementById('stopBtn');
+  const status = document.getElementById('status');
+  const waveStrip = document.getElementById('waveStrip');
+
+  let voices = [];
+  const synth = window.speechSynthesis;
+
+  function populateVoices(){
+    voices = synth.getVoices();
+    voiceSelect.innerHTML = '';
+    if(!voices.length){
+      const opt = document.createElement('option');
+      opt.textContent = 'No voices found — try reloading';
+      voiceSelect.appendChild(opt);
+      return;
+    }
+    voices.forEach((v, i) => {
+      const opt = document.createElement('option');
+      opt.value = i;
+      opt.textContent = `${v.name} (${v.lang})`;
+      voiceSelect.appendChild(opt);
+    });
+    // try to default to a Bengali voice if present
+    const bnIndex = voices.findIndex(v => v.lang.toLowerCase().startsWith('bn'));
+    if(bnIndex >= 0) voiceSelect.value = bnIndex;
+  }
+
+  populateVoices();
+  if(synth.onvoiceschanged !== undefined){
+    synth.onvoiceschanged = populateVoices;
+  }
+
+  rate.addEventListener('input', () => rateVal.textContent = parseFloat(rate.value).toFixed(1) + 'x');
+  pitch.addEventListener('input', () => pitchVal.textContent = parseFloat(pitch.value).toFixed(1));
+
+  function setControlsSpeaking(isSpeaking){
+    playBtn.disabled = isSpeaking;
+    pauseBtn.disabled = !isSpeaking;
+    stopBtn.disabled = !isSpeaking;
+    resumeBtn.disabled = true;
+    waveStrip.classList.toggle('active', isSpeaking);
+  }
+
+  playBtn.addEventListener('click', () => {
+    const text = textInput.value.trim();
+    if(!text){
+      status.textContent = 'Type something first.';
+      return;
+    }
+    if(!('speechSynthesis' in window)){
+      status.textContent = 'Your browser does not support speech synthesis. Try Chrome or Edge.';
+      return;
+    }
+    synth.cancel();
+    const utter = new SpeechSynthesisUtterance(text);
+    const selected = voices[voiceSelect.value];
+    if(selected) utter.voice = selected;
+    utter.rate = parseFloat(rate.value);
+    utter.pitch = parseFloat(pitch.value);
+
+    utter.onstart = () => {
+      status.textContent = 'Speaking…';
+      setControlsSpeaking(true);
+    };
+    utter.onend = () => {
+      status.textContent = 'Done.';
+      setControlsSpeaking(false);
+    };
+    utter.onerror = (e) => {
+      status.textContent = 'Error: ' + e.error;
+      setControlsSpeaking(false);
+    };
+
+    synth.speak(utter);
+  });
+
+  pauseBtn.addEventListener('click', () => {
+    synth.pause();
+    status.textContent = 'Paused.';
+    pauseBtn.disabled = true;
+    resumeBtn.disabled = false;
+    waveStrip.classList.remove('active');
+  });
+
+  resumeBtn.addEventListener('click', () => {
+    synth.resume();
+    status.textContent = 'Speaking…';
+    pauseBtn.disabled = false;
+    resumeBtn.disabled = true;
+    waveStrip.classList.add('active');
+  });
+
+  stopBtn.addEventListener('click', () => {
+    synth.cancel();
+    status.textContent = 'Stopped.';
+    setControlsSpeaking(false);
+  });
+</script>
+
+</body>
+</html>
